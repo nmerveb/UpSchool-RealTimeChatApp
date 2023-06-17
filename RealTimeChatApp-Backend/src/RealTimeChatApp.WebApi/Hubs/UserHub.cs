@@ -17,14 +17,12 @@ namespace RealTimeChatApp.WebApi.Hubs
         {
             userList.Add(username);
             await Clients.All.SendAsync("UserAdded", username);
-            await Clients.All.SendAsync("UserListUpdated", userList);
         }
 
         public async Task DeleteUser(string username)
         {
             userList.Remove(username);
             await Clients.All.SendAsync("UserDeleted", username);
-            await Clients.All.SendAsync("UserListUpdated", userList);
         }
 
         public async Task<List<Message>> GetMessageList()
@@ -37,6 +35,11 @@ namespace RealTimeChatApp.WebApi.Hubs
             message.CreatedOn = DateTime.Now;
             messageList.Add(message);
             await Clients.All.SendAsync("MessageAdded", message);
+        }
+
+        public async Task GetUpdatedMessageList()
+        {
+            await Clients.Caller.SendAsync("MessageListUpdated", messageList);
         }
     }
 

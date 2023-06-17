@@ -1,5 +1,6 @@
 import { ChangeEvent, useEffect, useState } from "react";
 import { HubConnection, HubConnectionBuilder } from "@microsoft/signalr";
+import "./ChatPage.css";
 
 type Message = {
   username: string;
@@ -18,8 +19,8 @@ const ChatPage = ({ username }: ChatPageProps) => {
     createdOn: new Date(),
   });
   const [userList, setUserList] = useState<string[]>([]);
-  const [chatMessages, setChatMessages] = useState<Message[] | null>(null);
-  const [connection, setConnection] = useState<HubConnection | null>(null);
+  const [chatMessages, setChatMessages] = useState<Message[]>();
+  const [connection, setConnection] = useState<HubConnection>();
 
   useEffect(() => {
     const hubConnection = new HubConnectionBuilder()
@@ -27,8 +28,8 @@ const ChatPage = ({ username }: ChatPageProps) => {
       .withAutomaticReconnect()
       .build();
 
-    hubConnection.on("UserAdded", (users: string[]) => {
-      setUserList(users);
+    hubConnection.on("UserAdded", (userName: string) => {
+      setUserList([...userList, userName]);
     });
 
     hubConnection.on("MessageAdded", (message: Message) => {
@@ -42,7 +43,10 @@ const ChatPage = ({ username }: ChatPageProps) => {
         await hubConnection.start();
         console.log("SignalR connection started.");
         setConnection(hubConnection);
-        getUserList(hubConnection);
+        hubConnection.invoke("AddUser", username);
+        const us = await hubConnection.invoke("GetUserList");
+
+        setUserList([...us]);
         getUpdatedMessageList(hubConnection);
       } catch (err: any) {
         console.error(err.toString());
@@ -58,13 +62,12 @@ const ChatPage = ({ username }: ChatPageProps) => {
     };
   }, []);
 
-  const getUserList = (hubConnection: HubConnection) => {
-    hubConnection
-      .invoke("getUserList")
-      .then((users: string[]) => {
-        setUserList(users);
-      })
-      .catch((err: Error) => console.error(err.toString()));
+  const getUserList = async () => {
+    if (connection) {
+      const users = await connection.invoke("GetUserList");
+      setUserList([...userList, users]);
+      //setUserList(userList);
+    }
   };
 
   const handleSendMessage = () => {
@@ -100,18 +103,18 @@ const ChatPage = ({ username }: ChatPageProps) => {
   };
 
   return (
-    <div>
-      <h1>Chat Uygulaması</h1>
-      <div>
-        <h2>Aktif Kullanıcılar:</h2>
+    <div className="chat-page">
+      <h1>Chat App</h1>
+      <div className="user-list">
+        <h2>Active Users:</h2>
         <ul>
           {userList.map((user, index) => (
             <li key={index}>{user}</li>
           ))}
         </ul>
       </div>
-      <div>
-        <h2>Mesajlar:</h2>
+      <div className="messages">
+        <h2>Messages:</h2>
         {chatMessages ? (
           <ul>
             {chatMessages.map((msg, index) => (
@@ -121,11 +124,11 @@ const ChatPage = ({ username }: ChatPageProps) => {
             ))}
           </ul>
         ) : (
-          <p>Mesajlar yükleniyor...</p>
+          <p>Loading...</p>
         )}
       </div>
-      <div>
-        <label>Mesaj:</label>
+      <div className="input-container">
+        <label>Message:</label>
         <input
           type="text"
           value={message.content}
@@ -137,7 +140,9 @@ const ChatPage = ({ username }: ChatPageProps) => {
             })
           }
         />
-        <button onClick={handleSendMessage}>Gönder</button>
+        <button onClick={handleSendMessage} className="send-button">
+          Send
+        </button>
       </div>
     </div>
   );

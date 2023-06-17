@@ -8,7 +8,7 @@ namespace RealTimeChatApp.WebApi.Hubs
         private static List<string> userList = new List<string>();
         private static List<Message> messageList = new List<Message>();
 
-        public async Task<List<string>> GetUserList()
+        public List<string> GetUserList()
         {
             return userList;
         }
@@ -25,7 +25,7 @@ namespace RealTimeChatApp.WebApi.Hubs
             await Clients.All.SendAsync("UserDeleted", username);
         }
 
-        public async Task<List<Message>> GetMessageList()
+        public List<Message> GetMessageList()
         {
             return messageList;
         }

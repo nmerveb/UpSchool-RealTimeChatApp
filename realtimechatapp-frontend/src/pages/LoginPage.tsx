@@ -21,12 +21,31 @@ const LoginPage: React.FC<LoginPageProps> = ({ onJoinChat }) => {
   };
 
   return (
-    <div>
-      <h1>Login</h1>
-      <div>
-        <label>Username:</label>
-        <input type="text" value={username} onChange={handleUsernameChange} />
-        <button onClick={handleJoinChat}>Join</button>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignContent: "center",
+        backgroundColor: "#F7FFE5",
+        width: "100wh",
+        height: "100vh",
+      }}
+    >
+      <div style={{ marginInline: "5px" }}>
+        <h1 style={{ marginTop: "100%" }}>Upstorage Chat</h1>
+        <div>
+          <div style={{ marginBlock: "8%", fontSize: "20px" }}>Name:</div>
+          <input
+            style={{ height: "25px", width: "100%" }}
+            type="text"
+            value={username}
+            onChange={handleUsernameChange}
+          />
+          <br />
+          <button className="send-button" onClick={handleJoinChat}>
+            <span style={{ color: "white" }}>Join Chat!</span>
+          </button>
+        </div>
       </div>
     </div>
   );

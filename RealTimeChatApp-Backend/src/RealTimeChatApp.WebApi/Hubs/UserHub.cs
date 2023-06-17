@@ -8,33 +8,35 @@ namespace RealTimeChatApp.WebApi.Hubs
         private static List<string> userList = new List<string>();
         private static List<Message> messageList = new List<Message>();
 
-        public List<string> GetUserList()
+        public async Task<List<string>> GetUserList()
         {
             return userList;
         }
 
-        public void AddUser(string username)
+        public async Task AddUser(string username)
         {
             userList.Add(username);
-            Clients.All.SendAsync("UserAdded", username);
+            await Clients.All.SendAsync("UserAdded", username);
+            await Clients.All.SendAsync("UserListUpdated", userList);
         }
 
-        public void DeleteUser(string username)
+        public async Task DeleteUser(string username)
         {
             userList.Remove(username);
-            Clients.All.SendAsync("UserDeleted", username);
+            await Clients.All.SendAsync("UserDeleted", username);
+            await Clients.All.SendAsync("UserListUpdated", userList);
         }
 
-        public List<Message> GetMessageList()
+        public async Task<List<Message>> GetMessageList()
         {
             return messageList;
         }
 
-        public void AddMessage(Message message)
+        public async Task AddMessage(Message message)
         {
             message.CreatedOn = DateTime.Now;
             messageList.Add(message);
-            Clients.All.SendAsync("MessageAdded", message);
+            await Clients.All.SendAsync("MessageAdded", message);
         }
     }
 
@@ -44,7 +46,6 @@ namespace RealTimeChatApp.WebApi.Hubs
         public string Content { get; set; }
         public DateTime CreatedOn { get; set; }
     }
-
 }
 
 

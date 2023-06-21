@@ -1,6 +1,6 @@
-import { ChangeEvent, useEffect, useState } from "react";
-import { HubConnection, HubConnectionBuilder } from "@microsoft/signalr";
-import "./ChatPage.css";
+import React, { useEffect, useState } from "react";
+import { HubConnectionBuilder } from "@microsoft/signalr";
+import { useParams } from "react-router-dom";
 
 type Message = {
   username: string;
@@ -8,67 +8,69 @@ type Message = {
   createdOn: Date;
 };
 
-type ChatPageProps = {
-  username: string;
-};
+const ChatPage: React.FC = () => {
+  const { userName } = useParams<{ userName: string }>();
 
-const ChatPage = ({ username }: ChatPageProps) => {
   const [message, setMessage] = useState<Message>({
-    username: "",
+    username: userName || "",
     content: "",
     createdOn: new Date(),
   });
   const [userList, setUserList] = useState<string[]>([]);
-  const [chatMessages, setChatMessages] = useState<Message[]>();
-  const [connection, setConnection] = useState<HubConnection>();
+  const [chatMessages, setChatMessages] = useState<Message[] | null>(null);
 
   useEffect(() => {
-    const hubConnection = new HubConnectionBuilder()
+    const newConnection = new HubConnectionBuilder()
       .withUrl("https://localhost:7163/userhub")
-      .withAutomaticReconnect()
       .build();
 
-    hubConnection.on("UserAdded", (userName: string) => {
-      setUserList([...userList, userName]);
+    newConnection.start().then(() => {
+      newConnection.invoke("GetUserList").then((users) => {
+        setUserList([...users]);
+
+        if (userName && users.includes(userName)) {
+          console.log("Kullanıcı zaten eklenmiş:", userName);
+        } else if (userName) {
+          newConnection.invoke("addUser", userName).then(() => {
+            console.log("Kullanıcı eklendi:", userName);
+          });
+        }
+      });
     });
 
-    hubConnection.on("MessageAdded", (message: Message) => {
-      setChatMessages((prevMessages) =>
-        prevMessages ? [...prevMessages, message] : [message]
-      );
+    newConnection.on("UserAdded", (user: string) => {
+      setUserList((prevUserList) => [...prevUserList, user]);
+      console.log("Kullanıcı eklendi:", user);
     });
 
-    const startConnection = async () => {
-      try {
-        await hubConnection.start();
-        console.log("SignalR connection started.");
-        setConnection(hubConnection);
-        hubConnection.invoke("AddUser", username);
-        const us = await hubConnection.invoke("GetUserList");
+    newConnection.on("UserRemoved", (user: string) => {
+      setUserList((prevUserList) => prevUserList.filter((u) => u !== user));
+      console.log("Kullanıcı çıkarıldı:", user);
+    });
 
-        setUserList([...us]);
-        getUpdatedMessageList(hubConnection);
-      } catch (err: any) {
-        console.error(err.toString());
-      }
-    };
+    newConnection.on("MessageListUpdated", (messages: Message[]) => {
+      setChatMessages(messages);
+      console.log("Mesaj listesi güncellendi:", messages);
+    });
 
-    startConnection();
+    // Bağlantı başarılı olduğunda mesaj listesini al
+    newConnection
+      .start()
+      .then(() => {
+        newConnection
+          .invoke("GetMessageList")
+          .then((messages: Message[]) => {
+            setChatMessages(messages);
+            console.log("Mesaj listesi alındı:", messages);
+          })
+          .catch((error) => console.error("Mesaj listesi alınamadı:", error));
+      })
+      .catch((error) => console.error("Bağlantı hatası:", error));
 
     return () => {
-      if (hubConnection) {
-        hubConnection.stop();
-      }
+      newConnection.stop();
     };
-  }, []);
-
-  const getUserList = async () => {
-    if (connection) {
-      const users = await connection.invoke("GetUserList");
-      setUserList([...userList, users]);
-      //setUserList(userList);
-    }
-  };
+  }, [userName]);
 
   const handleSendMessage = () => {
     if (message.content.trim() === "") {
@@ -76,46 +78,50 @@ const ChatPage = ({ username }: ChatPageProps) => {
       return;
     }
 
-    if (connection && connection.state === "Connected") {
-      connection
-        .invoke("addMessage", {
-          username: username,
-          content: message.content,
-          createdOn: new Date(),
-        })
-        .then(() => {
-          console.log("Mesaj gönderildi:", message.content);
-          setMessage({ username: "", content: "", createdOn: new Date() });
-        })
-        .catch((err: Error) => console.error(err.toString()));
-    } else {
-      console.error("SignalR connection is not in the 'Connected' state.");
-    }
-  };
+    const connection = new HubConnectionBuilder()
+      .withUrl("https://localhost:7163/userhub")
+      .build();
 
-  const getUpdatedMessageList = (hubConnection: HubConnection) => {
-    hubConnection
-      .invoke("getUpdatedMessageList")
-      .then((messages: Message[]) => {
-        setChatMessages(messages);
+    connection
+      .start()
+      .then(() => {
+        connection
+          .invoke("AddMessage", {
+            username: message.username,
+            content: message.content,
+            createdOn: new Date(),
+          })
+          .then(() => {
+            console.log("Mesaj gönderildi:", message.content);
+            setMessage({
+              username: message.username,
+              content: "",
+              createdOn: new Date(),
+            });
+
+            connection.invoke("GetUpdatedMessageList");
+          })
+          .catch((err) => console.error(err.toString()));
       })
-      .catch((err: Error) => console.error(err.toString()));
+      .catch((err) => console.error(err.toString()));
   };
 
   return (
-    <div className="chat-page">
-      <h1>Chat App</h1>
-      <div className="user-list">
-        <h2>Active Users:</h2>
+    <div>
+      <h1>Chat Uygulaması</h1>
+      <div>
+        <h2>Aktif Kullanıcılar:</h2>
         <ul>
           {userList.map((user, index) => (
             <li key={index}>{user}</li>
           ))}
         </ul>
       </div>
-      <div className="messages">
-        <h2>Messages:</h2>
-        {chatMessages ? (
+      <div>
+        <h2>Mesajlar:</h2>
+        {chatMessages === null ? (
+          <div>Mesajlar yükleniyor...</div>
+        ) : (
           <ul>
             {chatMessages.map((msg, index) => (
               <li key={index}>
@@ -123,16 +129,14 @@ const ChatPage = ({ username }: ChatPageProps) => {
               </li>
             ))}
           </ul>
-        ) : (
-          <p>Loading...</p>
         )}
       </div>
-      <div className="input-container">
-        <label>Message:</label>
+      <div>
+        <label>Mesaj:</label>
         <input
           type="text"
           value={message.content}
-          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+          onChange={(e) =>
             setMessage({
               ...message,
               content: e.target.value,
@@ -140,201 +144,10 @@ const ChatPage = ({ username }: ChatPageProps) => {
             })
           }
         />
-        <button onClick={handleSendMessage} className="send-button">
-          Send
-        </button>
+        <button onClick={handleSendMessage}>Gönder</button>
       </div>
     </div>
   );
 };
 
 export default ChatPage;
-
-// import React, { ChangeEvent, useEffect, useState } from "react";
-// import { HubConnection, HubConnectionBuilder } from "@microsoft/signalr";
-
-// type Message = {
-//   username: string;
-//   content: string;
-//   createdOn: Date;
-// };
-
-// const ChatPage: React.FC = () => {
-//   const [username, setUsername] = useState<string>("");
-//   const [message, setMessage] = useState<Message>({
-//     username: "",
-//     content: "",
-//     createdOn: new Date(),
-//   });
-//   const [userList, setUserList] = useState<string[]>([]);
-//   const [chatMessages, setChatMessages] = useState<Message[]>([]);
-
-//   useEffect(() => {
-//     let connection: HubConnection | null = null;
-
-//     const startConnection = async () => {
-//       connection = new HubConnectionBuilder()
-//         .withUrl("https://localhost:7163/userhub")
-//         .withAutomaticReconnect()
-//         .build();
-
-//       connection.on("UserListUpdated", (users: string[]) => {
-//         setUserList(users);
-//       });
-
-//       connection.on("MessageAdded", (message: Message) => {
-//         setChatMessages((prevMessages) => [...prevMessages, message]);
-//       });
-
-//       try {
-//         await connection.start();
-//         console.log("SignalR bağlantısı başlatıldı.");
-//         getUserList(connection); // Kullanıcı listesini başlatma
-//       } catch (err: any) {
-//         console.error(err.toString());
-//       }
-//     };
-
-//     startConnection();
-
-//     return () => {
-//       if (connection) {
-//         connection.stop();
-//       }
-//     };
-//   }, []);
-
-//   useEffect(() => {
-//     const connection = new HubConnectionBuilder()
-//       .withUrl("https://localhost:7163/userhub")
-//       .build();
-
-//     getUpdatedMessageList(connection); // Mesaj listesini al
-
-//     return () => {
-//       if (connection) {
-//         connection.stop();
-//       }
-//     };
-//   }, []);
-
-//   const getUserList = (connection: HubConnection) => {
-//     connection
-//       .invoke("getUserList")
-//       .then((users: string[]) => {
-//         setUserList(users);
-//       })
-//       .catch((err) => console.error(err.toString()));
-//   };
-
-//   const handleUsernameChange = (e: ChangeEvent<HTMLInputElement>) => {
-//     setUsername(e.target.value);
-//   };
-
-//   const handleJoinChat = () => {
-//     if (username.trim() === "") {
-//       alert("Lütfen geçerli bir kullanıcı adı girin.");
-//       return;
-//     }
-
-//     const connection = new HubConnectionBuilder()
-//       .withUrl("https://localhost:7163/userhub")
-//       .build();
-
-//     connection
-//       .start()
-//       .then(() => {
-//         connection
-//           .invoke("addUser", username)
-//           .then(() => {
-//             console.log("Kullanıcı eklendi:", username);
-//             getUserList(connection); // Kullanıcı listesini güncelleme
-//           })
-//           .catch((err) => console.error(err.toString()));
-//       })
-//       .catch((err) => console.error(err.toString()));
-//   };
-
-//   const handleSendMessage = () => {
-//     if (message.content.trim() === "") {
-//       alert("Lütfen geçerli bir mesaj girin.");
-//       return;
-//     }
-
-//     const connection = new HubConnectionBuilder()
-//       .withUrl("https://localhost:7163/userhub")
-//       .build();
-
-//     connection
-//       .start()
-//       .then(() => {
-//         connection
-//           .invoke("addMessage", {
-//             username: username,
-//             content: message.content,
-//             createdOn: new Date(),
-//           })
-//           .then(() => {
-//             console.log("Mesaj gönderildi:", message.content);
-//             setMessage({ username: "", content: "", createdOn: new Date() });
-//           })
-//           .catch((err) => console.error(err.toString()));
-//       })
-//       .catch((err) => console.error(err.toString()));
-//   };
-
-//   const getUpdatedMessageList = (connection: HubConnection) => {
-//     connection
-//       .invoke("getUpdatedMessageList")
-//       .then((messages: Message[]) => {
-//         setChatMessages(messages);
-//       })
-//       .catch((err) => console.error(err.toString()));
-//   };
-
-//   return (
-//     <div>
-//       <h1>Chat Uygulaması</h1>
-//       <div>
-//         <label>Kullanıcı Adı:</label>
-//         <input type="text" value={username} onChange={handleUsernameChange} />
-//         <button onClick={handleJoinChat}>Katıl</button>
-//       </div>
-//       <div>
-//         <h2>Aktif Kullanıcılar:</h2>
-//         <ul>
-//           {userList.map((user, index) => (
-//             <li key={index}>{user}</li>
-//           ))}
-//         </ul>
-//       </div>
-//       <div>
-//         <h2>Mesajlar:</h2>
-//         <ul>
-//           {chatMessages.map((msg, index) => (
-//             <li key={index}>
-//               <strong>{msg.username}:</strong> {msg.content}
-//             </li>
-//           ))}
-//         </ul>
-//       </div>
-//       <div>
-//         <label>Mesaj:</label>
-//         <input
-//           type="text"
-//           value={message.content}
-//           onChange={(e) =>
-//             setMessage({
-//               ...message,
-//               content: e.target.value,
-//               createdOn: new Date(),
-//             })
-//           }
-//         />
-//         <button onClick={handleSendMessage}>Gönder</button>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default ChatPage;

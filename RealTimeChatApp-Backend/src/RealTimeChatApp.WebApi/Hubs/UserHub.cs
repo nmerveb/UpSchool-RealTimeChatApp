@@ -5,7 +5,8 @@ namespace RealTimeChatApp.WebApi.Hubs
     public class UserHub : Hub
     {
         //task lis message mesajlari doner api olmadan 
-        private static List<string> userList = new List<string>();
+        private static List<string> userList = new List<string> ();
+
         private static List<Message> messageList = new List<Message>();
 
         public List<string> GetUserList()

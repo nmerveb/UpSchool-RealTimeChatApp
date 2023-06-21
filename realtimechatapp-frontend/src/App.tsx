@@ -1,50 +1,47 @@
-import "./App.css";
-import ChatPage from "./pages/ChatPage";
+import React from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+
 import LoginPage from "./pages/LoginPage";
-import React, { useState } from "react";
+import ChatPage from "./pages/ChatPage";
 
-enum Page {
-  LOGIN,
-  CHAT,
-}
-
-function App() {
-  const [currentPage, setCurrentPage] = useState<Page>(Page.LOGIN);
-  const [username, setUsername] = useState<string>("");
-
-  const handleJoinChat = (username: string) => {
-    setUsername(username);
-    setCurrentPage(Page.CHAT);
-  };
-
+const App: React.FC = () => {
   return (
-    <div className="App">
-      {currentPage === Page.LOGIN && <LoginPage onJoinChat={handleJoinChat} />}
-      {currentPage === Page.CHAT && <ChatPage username={username} />}
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/chat/:userName" element={<ChatPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<LoginPage />} />
+      </Routes>
+    </BrowserRouter>
   );
-}
+};
+
 export default App;
-// import React from "react";
-// import { Route, Routes } from "react-router-dom";
 
-// import LoginPage from "./pages/LoginPage";
+// import "./App.css";
 // import ChatPage from "./pages/ChatPage";
+// import LoginPage from "./pages/LoginPage";
+// import React, { useState } from "react";
 
-// const App: React.FC = () => {
-//   const isLoggedIn = false; // Kullanıcının oturum açıp açmadığını burada kontrol edin
+// enum Page {
+//   LOGIN,
+//   CHAT,
+// }
+
+// function App() {
+//   const [currentPage, setCurrentPage] = useState<Page>(Page.LOGIN);
+//   const [username, setUsername] = useState<string>("");
+
+//   const handleJoinChat = (username: string) => {
+//     setUsername(username);
+//     setCurrentPage(Page.CHAT);
+//   };
 
 //   return (
-//     <Routes>
-//       <Route path="/">
-//         {isLoggedIn ? (
-//           <Route path="/chat" element={<ChatPage />} />
-//         ) : (
-//           <Route path="/login" element={<LoginPage />} />
-//         )}
-//       </Route>
-//     </Routes>
+//     <div className="App">
+//       {currentPage === Page.LOGIN && <LoginPage onJoinChat={handleJoinChat} />}
+//       {currentPage === Page.CHAT && <ChatPage username={username} />}
+//     </div>
 //   );
-// };
-
-//export default App;
+// }
+// export default App;
